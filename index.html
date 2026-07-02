@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ISS Trip Voucher</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;min-height:100vh}
+.wrap{max-width:520px;margin:0 auto;padding:14px}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
+label{display:block;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px}
+input,textarea,select{width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:9px 11px;font-size:14px;background:#f8fafc;color:#1e293b;outline:none;font-family:inherit;transition:border 0.15s}
+input:focus,textarea:focus,select:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.12)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field{margin-bottom:12px}
+.btn{padding:11px 18px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;border:1px solid #cbd5e1;background:#fff;color:#374151;transition:all 0.15s;font-family:inherit}
+.btn:hover{background:#f1f5f9}
+.btn-primary{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
+.btn-primary:hover{background:#1e40af}
+.btn-success{background:#16a34a;border-color:#16a34a;color:#fff}
+.btn-success:disabled{background:#e2e8f0;border-color:#e2e8f0;color:#94a3b8;cursor:not-allowed}
+.btn-row{display:flex;gap:8px}
+.btn-row .btn{flex:1}
+canvas{border:2px dashed #93c5fd;border-radius:10px;width:100%;background:#fff;display:block;touch-action:none;cursor:crosshair}
+.sig-actions{display:flex;justify-content:center;gap:8px;margin-top:8px}
+.alert-blue{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px;font-size:13px;color:#1e40af;margin-bottom:10px;line-height:1.6}
+.alert-green{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;font-size:13px;color:#15803d;text-align:center;margin-top:10px}
+.alert-success{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:18px;text-align:center;margin-bottom:12px}
+.badge{font-size:11px;background:#fff;border:1px solid #bfdbfe;color:#1d4ed8;padding:5px 12px;border-radius:999px;cursor:pointer}
+.lang-toggle{display:flex;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden}
+.lang-btn{padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;color:#64748b;font-family:inherit;transition:all 0.12s}
+.lang-btn.active{background:#1d4ed8;color:#fff}
+.pax-item{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:8px}
+.pax-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.pax-title{font-size:13px;font-weight:600;color:#374151}
+.btn-remove{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600}
+.step-dot{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.step-active{background:#1d4ed8;color:#fff}
+.step-done{background:#16a34a;color:#fff}
+.step-idle{background:#e2e8f0;color:#94a3b8}
+.step-label{font-size:11px}
+.step-label.active{color:#1d4ed8;font-weight:600}
+.step-label.idle{color:#94a3b8}
+.step-line{height:1px;background:#e2e8f0;flex:1}
+.voucher-header{background:#0f2744;color:#fff;border-radius:12px 12px 0 0;overflow:hidden}
+.voucher-logo-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,0.12)}
+.voucher-title-bar{padding:10px 16px 14px}
+.voucher-body{padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;background:#fff}
+.vf label{color:#94a3b8;text-transform:uppercase;font-size:10px;letter-spacing:0.04em;margin-bottom:2px;font-weight:600}
+.vf p{font-size:13px;font-weight:600;color:#1e293b}
+.voucher-pax{border-top:1px solid #f1f5f9;padding:10px 16px;background:#fff}
+.voucher-sig{border-top:1px dashed #e2e8f0;padding:12px 16px;background:#fff}
+.voucher-footer{border-top:1px solid #e2e8f0;padding:12px 16px;background:#f8fafc;font-size:11px;color:#64748b;line-height:1.4}
+.history-item{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:13px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:8px;transition:all 0.1s}
+.history-item:hover{border-color:#93c5fd}
+.rank-badge{display:inline-block;background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:600;margin-right:5px;border:1px solid #bfdbfe}
+textarea{resize:none}
+.app-logo{height:38px;display:block;object-fit:contain}
+@media print{
+  .no-print{display:none!important}
+  body{background:#fff}
+  .wrap{padding:0;max-width:100%}
+  .card{box-shadow:none}
+  .voucher-header{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useRef,useEffect}=React;
+
+const RANKS=['Captain','Chief Officer','2nd Officer','3rd Officer','Chief Engineer','2nd Engineer','3rd Engineer','4th Engineer','Bosun','AB Seaman','OS','Cook','Electrician','Other'];
+
+const T={
+  th:{
+    title:'ใบเที่ยวรถ',sub:'Inchcape Shipping Services (Thailand) Ltd.',
+    date:'วันที่',depart:'เวลาออก',arrive:'เวลาถึง',
+    vessel:'ชื่อเรือ',
+    pax:'รายชื่อผู้โดยสาร',name:'ชื่อ-นามสกุล',rank:'ตำแหน่ง',
+    addPax:'+ เพิ่มผู้โดยสาร',remove:'ลบ',
+    from:'ต้นทาง',to:'ปลายทาง',
+    note:'หมายเหตุ',
+    next:'ถัดไป → ขอลายเซ็น',back:'← ย้อนกลับ',
+    confirm:'✓ ยืนยันออกใบเที่ยว',
+    newVoucher:'+ ใบเที่ยวใหม่',print:'พิมพ์',history:'ประวัติ',
+    sign:'ขอลายเซ็นลูกค้า',clearSig:'ล้าง',saveSig:'ยืนยันลายเซ็น',
+    sigSaved:'บันทึกลายเซ็นแล้ว กดยืนยันเพื่อออกใบเที่ยว',
+    done:'ออกใบเที่ยวเรียบร้อย!',
+    route:'เส้นทาง',
+    step1:'กรอกข้อมูล',step2:'ลายเซ็น',step3:'เสร็จสิ้น',
+    noHistory:'ยังไม่มีประวัติ',
+    sigNote:'วาดลายเซ็นในกรอบด้านล่าง',
+    passengers:'ผู้โดยสาร',signedBy:'ลายเซ็นผู้โดยสาร',
+    passenger:'ผู้โดยสาร',
+  },
+  en:{
+    title:'Trip Voucher',sub:'Inchcape Shipping Services (Thailand) Ltd.',
+    date:'Date',depart:'Departure',arrive:'Arrival',
+    vessel:'Vessel name',
+    pax:'Passengers',name:'Full name',rank:'Rank',
+    addPax:'+ Add passenger',remove:'Remove',
+    from:'From',to:'To',
+    note:'Remarks',
+    next:'Next → Get signature',back:'← Back',
+    confirm:'✓ Confirm & issue voucher',
+    newVoucher:'+ New voucher',print:'Print',history:'History',
+    sign:'Customer signature',clearSig:'Clear',saveSig:'Confirm signature',
+    sigSaved:'Signature saved. Press confirm to issue voucher.',
+    done:'Voucher issued!',
+    route:'Route',
+    step1:'Details',step2:'Signature',step3:'Done',
+    noHistory:'No vouchers yet',
+    sigNote:'Sign in the box below',
+    passengers:'Passengers',signedBy:'Passenger signature',
+    passenger:'Passenger',
+  }
+};
+
+const today=()=>new Date().toISOString().slice(0,10);
+const emptyPax=()=>({id:Date.now()+Math.random(),name:'',rank:''});
+const emptyForm=()=>({date:today(),vessel:'',from:'',to:'',departTime:'',arriveTime:'',note:'',passengers:[emptyPax()]});
+
+function SignaturePad({onSave,onClear,t}){
+  const ref=useRef(null);
+  const drawing=useRef(false);
+  const last=useRef(null);
+  useEffect(()=>{
+    const c=ref.current;
+    const dpr=window.devicePixelRatio||1;
+    c.width=c.offsetWidth*dpr;
+    c.height=150*dpr;
+    const ctx=c.getContext('2d');
+    ctx.scale(dpr,dpr);
+    ctx.fillStyle='#fff';
+    ctx.fillRect(0,0,c.offsetWidth,150);
+  },[]);
+  const pos=(e)=>{
+    const r=ref.current.getBoundingClientRect();
+    const s=e.touches?e.touches[0]:e;
+    return{x:s.clientX-r.left,y:s.clientY-r.top};
+  };
+  const down=(e)=>{e.preventDefault();drawing.current=true;last.current=pos(e)};
+  const move=(e)=>{
+    e.preventDefault();
+    if(!drawing.current)return;
+    const c=ref.current,ctx=c.getContext('2d'),p=pos(e);
+    ctx.beginPath();ctx.moveTo(last.current.x,last.current.y);ctx.lineTo(p.x,p.y);
+    ctx.strokeStyle='#0f2744';ctx.lineWidth=2.2;ctx.lineCap='round';ctx.stroke();
+    last.current=p;
+  };
+  const up=(e)=>{e.preventDefault();drawing.current=false};
+  const clear=()=>{
+    const c=ref.current,ctx=c.getContext('2d');
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
+    onClear();
+  };
+  return(
+    <div>
+      <p style={{fontSize:12,color:'#64748b',textAlign:'center',marginBottom:8}}>{t.sigNote}</p>
+      <canvas ref={ref} style={{height:150}}
+        onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
+        onTouchStart={down} onTouchMove={move} onTouchEnd={up}/>
+      <div className="sig-actions">
+        <button className="btn" onClick={clear}>{t.clearSig}</button>
+        <button className="btn btn-primary" onClick={()=>onSave(ref.current.toDataURL('image/png'))}>{t.saveSig}</button>
+      </div>
+    </div>
+  );
+}
+
+function VoucherView({v}){
+  const t=T[v.lang||'th'];
+  const paxList=v.passengers||[];
+  return(
+    <div style={{border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden',boxShadow:'0 2px 12px rgba(0,0,0,0.07)'}}>
+      <div className="voucher-header">
+        <div className="voucher-logo-bar">
+          <img src="ISS Logo.png" alt="ISS Logo" style={{height:'46px', display:'block', objectFit:'contain'}}/>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:10,opacity:0.5,letterSpacing:'0.08em',textTransform:'uppercase'}}>#{String(v.id).slice(-6)}</div>
+            <div style={{fontSize:11,opacity:0.7,marginTop:2}}>{v.createdAt}</div>
+          </div>
+        </div>
+        <div className="voucher-title-bar">
+          <div style={{fontWeight:700,fontSize:17,letterSpacing:'0.01em'}}>{t.title}</div>
+          <div style={{fontSize:11,opacity:0.55,marginTop:2}}>{t.sub}</div>
+        </div>
+      </div>
+      <div className="voucher-body">
+        {[
+          [t.date,v.date],
+          [t.vessel,v.vessel],
+          [t.from,v.from],
+          [t.to,v.to],
+          v.departTime&&[t.depart,v.departTime+' น.'],
+          v.arriveTime&&[t.arrive,v.arriveTime+' น.'],
+        ].filter(Boolean).map(([l,val])=>(
+          <div className="vf" key={l}><label>{l}</label><p>{val||'-'}</p></div>
+        ))}
+        {v.note&&<div className="vf" style={{gridColumn:'1/-1'}}><label>{t.note}</label><p>{v.note}</p></div>}
+      </div>
+      {paxList.length>0&&(
+        <div className="voucher-pax">
+          <div style={{fontSize:10,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:600,marginBottom:8}}>{t.passengers}</div>
+          {paxList.map((p,i)=>(
+            <div key={i} style={{fontSize:13,padding:'5px 0',borderBottom:'1px solid #f1f5f9',display:'flex',alignItems:'center'}}>
+              <span style={{color:'#94a3b8',marginRight:6,fontSize:11,minWidth:16}}>{i+1}.</span>
+              {p.rank&&<span className="rank-badge">{p.rank}</span>}
+              <span style={{color:'#1e293b',fontWeight:600}}>{p.name||'-'}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {v.signature&&(
+        <div className="voucher-sig">
+          <div style={{fontSize:10,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:600,marginBottom:6}}>{t.signedBy}</div>
+          <img src={v.signature} style={{height:54,objectFit:'contain',border:'1px solid #e2e8f0',borderRadius:6,padding:4,background:'#fff'}}/>
+          <div style={{fontSize:11,color:'#94a3b8',marginTop:4}}>{paxList.map(p=>p.name).filter(Boolean).join(', ')||'-'} — {v.createdAt}</div>
+        </div>
+      )}
+      <div className="voucher-footer">
+        <strong>Inchcape Shipping Services (Thailand) Ltd.</strong><br/>
+        @Sathorn Building, 21st Floor, Zone B2, 9/9 South Sathorn Rd., Yannawa, Sathorn, Bangkok, 10120
+      </div>
+    </div>
+  );
+}
+
+function App(){
+  const [lang,setLang]=useState('th');
+  const t=T[lang];
+  const [step,setStep]=useState('form');
+  const [form,setForm]=useState(emptyForm());
+  const [sig,setSig]=useState(null);
+  const [done,setDone]=useState(null);
+  const [vouchers,setVouchers]=useState([]);
+  const [viewing,setViewing]=useState(null);
+
+  const setF=(k)=>(e)=>setForm(p=>({...p,[k]:e.target.value}));
+  const setPax=(id,k,v)=>setForm(p=>({...p,passengers:p.passengers.map(px=>px.id===id?{...px,[k]:v}:px)}));
+  const addPax=()=>setForm(p=>({...p,passengers:[...p.passengers,emptyPax()]}));
+  const removePax=(id)=>setForm(p=>({...p,passengers:p.passengers.filter(px=>px.id!==id)}));
+  const submitForm=(e)=>{e.preventDefault();setStep('sign')};
+  const confirm=()=>{
+    if(!sig)return alert(lang==='th'?'กรุณาเซ็นชื่อก่อน':'Please sign before confirming');
+    const v={...form,id:Date.now(),signature:sig,lang,createdAt:new Date().toLocaleString(lang==='th'?'th-TH':'en-GB')};
+    setVouchers(p=>[v,...p]);
+    setDone(v);
+    setStep('done');
+  };
+  const newForm=()=>{setForm(emptyForm());setSig(null);setDone(null);setStep('form')};
+
+  if(viewing)return(
+    <div className="wrap">
+      <div className="btn-row no-print" style={{marginBottom:12}}>
+        <button className="btn" onClick={()=>setViewing(null)}>{lang==='th'?'← กลับ':'← Back'}</button>
+        <button className="btn btn-primary" onClick={()=>window.print()}>🖨 {t.print}</button>
+      </div>
+      <VoucherView v={viewing}/>
+    </div>
+  );
+
+  if(step==='history')return(
+    <div className="wrap">
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+        <div style={{fontWeight:700,fontSize:16,color:'#1e293b'}}>{t.history}</div>
+        <button className="btn" onClick={()=>setStep('form')}>{lang==='th'?'← กลับ':'← Back'}</button>
+      </div>
+      {vouchers.length===0
+        ?<p style={{textAlign:'center',color:'#94a3b8',padding:40}}>{t.noHistory}</p>
+        :vouchers.map(v=>(
+          <div className="history-item" key={v.id} onClick={()=>setViewing(v)}>
+            <div>
+              <div style={{fontWeight:600,fontSize:13,color:'#1e293b'}}>{v.vessel}</div>
+              <div style={{fontSize:12,color:'#64748b',marginTop:1}}>{v.from} → {v.to}</div>
+              <div style={{fontSize:11,color:'#94a3b8',marginTop:2}}>{(v.passengers||[]).map(p=>p.name).filter(Boolean).join(', ')}</div>
+            </div>
+            <div style={{textAlign:'right'}}>
+              <div style={{fontSize:11,color:'#94a3b8'}}>{v.date}</div>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  );
+
+  return(
+    <div className="wrap">
+      {/* Top bar */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}} className="no-print">
+        <img src="ISS Logo.png" alt="ISS Logo" className="app-logo"/>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          {vouchers.length>0&&step!=='done'&&(
+            <button className="badge" onClick={()=>setStep('history')}>{t.history} ({vouchers.length})</button>
+          )}
+          <div className="lang-toggle">
+            <button className={`lang-btn${lang==='th'?' active':''}`} onClick={()=>setLang('th')}>TH</button>
+            <button className={`lang-btn${lang==='en'?' active':''}`} onClick={()=>setLang('en')}>EN</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Steps */}
+      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:18}} className="no-print">
+        {[t.step1,t.step2,t.step3].map((s,i)=>{
+          const active=(i===0&&step==='form')||(i===1&&step==='sign')||(i===2&&step==='done');
+          const isDone=(i===0&&(step==='sign'||step==='done'))||(i===1&&step==='done');
+          return(
+            <React.Fragment key={i}>
+              <div className={`step-dot ${isDone?'step-done':active?'step-active':'step-idle'}`}>{isDone?'✓':i+1}</div>
+              <span className={`step-label ${active?'active':'idle'}`}>{s}</span>
+              {i<2&&<div className="step-line"/>}
+            </React.Fragment>
+          );
+        })}
+      </div>
+
+      {/* FORM */}
+      {step==='form'&&(
+        <form onSubmit={submitForm} className="card">
+          <div className="grid2">
+            <div className="field"><label>{t.date} *</label><input type="date" value={form.date} onChange={setF('date')} required/></div>
+            <div className="field"><label>{t.depart}</label><input type="time" value={form.departTime} onChange={setF('departTime')}/></div>
+          </div>
+          <div className="field"><label>{t.vessel} *</label><input placeholder={lang==='th'?'ชื่อเรือ':'Vessel name'} value={form.vessel} onChange={setF('vessel')} required/></div>
+          <div className="grid2">
+            <div className="field"><label>{t.from} *</label><input placeholder={lang==='th'?'จุดรับ':'Pick-up point'} value={form.from} onChange={setF('from')} required/></div>
+            <div className="field"><label>{t.to} *</label><input placeholder={lang==='th'?'จุดส่ง':'Drop-off point'} value={form.to} onChange={setF('to')} required/></div>
+          </div>
+          <div className="field"><label>{t.arrive}</label><input type="time" value={form.arriveTime} onChange={setF('arriveTime')}/></div>
+
+          {/* Passengers */}
+          <div style={{borderTop:'1px solid #f1f5f9',paddingTop:14,marginTop:2}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+              <label style={{margin:0}}>{t.pax} *</label>
+              <button type="button" className="btn btn-primary" style={{padding:'5px 12px',fontSize:12}} onClick={addPax}>{t.addPax}</button>
+            </div>
+            {form.passengers.map((px,i)=>(
+              <div className="pax-item" key={px.id}>
+                <div className="pax-header">
+                  <span className="pax-title">{t.passenger} {i+1}</span>
+                  {form.passengers.length>1&&(
+                    <button type="button" className="btn-remove" onClick={()=>removePax(px.id)}>{t.remove}</button>
+                  )}
+                </div>
+                <div className="grid2">
+                  <div className="field" style={{marginBottom:0}}>
+                    <label>{t.name}</label>
+                    <input placeholder={lang==='th'?'ชื่อ-นามสกุล':'Full name'} value={px.name} onChange={e=>setPax(px.id,'name',e.target.value)}/>
+                  </div>
+                  <div className="field" style={{marginBottom:0}}>
+                    <label>{t.rank}</label>
+                    <select value={px.rank} onChange={e=>setPax(px.id,'rank',e.target.value)}>
+                      <option value="">— select —</option>
+                      {RANKS.map(r=><option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="field" style={{marginTop:4}}><label>{t.note}</label><textarea rows={2} value={form.note} onChange={setF('note')}/></div>
+          <button type="submit" className="btn btn-primary" style={{width:'100%',padding:13}}>{t.next}</button>
+        </form>
+      )}
+
+      {/* SIGN */}
+      {step==='sign'&&(
+        <div className="card">
+          <div style={{fontWeight:700,fontSize:15,color:'#1e293b',marginBottom:12}}>{t.sign}</div>
+          <div className="alert-blue">
+            <div><strong>{t.vessel}:</strong> {form.vessel}</div>
+            <div><strong>{t.route}:</strong> {form.from} → {form.to}</div>
+            <div style={{marginTop:6}}><strong>{t.passengers}:</strong></div>
+            {form.passengers.filter(p=>p.name).map((p,i)=>(
+              <div key={i} style={{paddingLeft:10,fontSize:12,marginTop:2}}>
+                • {p.rank&&<span className="rank-badge">{p.rank}</span>}{p.name}
+              </div>
+            ))}
+          </div>
+          <SignaturePad onSave={setSig} onClear={()=>setSig(null)} t={t}/>
+          {sig&&<div className="alert-green">✓ {t.sigSaved}</div>}
+          <div className="btn-row" style={{marginTop:12}}>
+            <button className="btn" onClick={()=>setStep('form')}>{t.back}</button>
+            <button className="btn btn-success" onClick={confirm} disabled={!sig}>{t.confirm}</button>
+          </div>
+        </div>
+      )}
+
+      {/* DONE */}
+      {step==='done'&&done&&(
+        <>
+          <div className="alert-success no-print">
+            <div style={{fontSize:32,marginBottom:6}}>✅</div>
+            <div style={{fontWeight:700,color:'#15803d',fontSize:16}}>{t.done}</div>
+          </div>
+          <VoucherView v={done}/>
+          <div className="btn-row no-print" style={{marginTop:10}}>
+            <button className="btn btn-primary" style={{flex:'none',padding:'11px 20px'}} onClick={()=>window.print()}>🖨 {t.print}</button>
+            <button className="btn btn-primary" style={{flex:1}} onClick={newForm}>{t.newVoucher}</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<React.StrictMode><App/></React.StrictMode>);
+</script>
+</body>
+</html>
