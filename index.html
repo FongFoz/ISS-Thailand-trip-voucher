@@ -30,6 +30,7 @@ canvas{border:2px dashed #93c5fd;border-radius:10px;width:100%;background:#fff;d
 .alert-blue{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px;font-size:13px;color:#1e40af;margin-bottom:10px;line-height:1.6}
 .alert-green{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;font-size:13px;color:#15803d;text-align:center;margin-top:10px}
 .alert-success{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:18px;text-align:center;margin-bottom:12px}
+.alert-error{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;font-size:13px;color:#dc2626;text-align:center;margin-top:8px}
 .badge{font-size:11px;background:#fff;border:1px solid #bfdbfe;color:#1d4ed8;padding:5px 12px;border-radius:999px;cursor:pointer}
 .lang-toggle{display:flex;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden}
 .lang-btn{padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;color:#64748b;font-family:inherit;transition:all 0.12s}
@@ -58,6 +59,9 @@ canvas{border:2px dashed #93c5fd;border-radius:10px;width:100%;background:#fff;d
 .history-item{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:13px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:8px;transition:all 0.1s}
 .history-item:hover{border-color:#93c5fd}
 .rank-badge{display:inline-block;background:#eff6ff;color:#1d4ed8;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:600;margin-right:5px;border:1px solid #bfdbfe}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.4);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;margin-right:6px;vertical-align:middle}
+.spinner-blue{border-color:rgba(29,78,216,0.2);border-top-color:#1d4ed8}
+@keyframes spin{to{transform:rotate(360deg)}}
 textarea{resize:none}
 .app-logo{height:38px;display:block;object-fit:contain}
 @media print{
@@ -74,6 +78,8 @@ textarea{resize:none}
 <script type="text/babel">
 const {useState,useRef,useEffect}=React;
 
+const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbxmNyfxP7-Afji7lwrWxozcnzRjT-GnebQ7mFChVJmE1dXoKcd7kYyBQQfvGscMG0qNtQ/exec';
+
 const RANKS=['Captain','Chief Officer','2nd Officer','3rd Officer','Chief Engineer','2nd Engineer','3rd Engineer','4th Engineer','Bosun','AB Seaman','OS','Cook','Electrician','Other'];
 
 const T={
@@ -87,16 +93,22 @@ const T={
     note:'หมายเหตุ',
     next:'ถัดไป → ขอลายเซ็น',back:'← ย้อนกลับ',
     confirm:'✓ ยืนยันออกใบเที่ยว',
+    saving:'กำลังบันทึก...',
     newVoucher:'+ ใบเที่ยวใหม่',print:'พิมพ์',history:'ประวัติ',
+    loadHistory:'โหลดประวัติ',loading:'กำลังโหลด...',
     sign:'ขอลายเซ็นลูกค้า',clearSig:'ล้าง',saveSig:'ยืนยันลายเซ็น',
     sigSaved:'บันทึกลายเซ็นแล้ว กดยืนยันเพื่อออกใบเที่ยว',
     done:'ออกใบเที่ยวเรียบร้อย!',
+    saveOk:'บันทึกลง Google Sheets แล้ว',
+    saveErr:'บันทึกไม่สำเร็จ — ตรวจสอบ URL หรืออินเทอร์เน็ต',
+    loadErr:'โหลดประวัติไม่สำเร็จ',
     route:'เส้นทาง',
     step1:'กรอกข้อมูล',step2:'ลายเซ็น',step3:'เสร็จสิ้น',
     noHistory:'ยังไม่มีประวัติ',
     sigNote:'วาดลายเซ็นในกรอบด้านล่าง',
     passengers:'ผู้โดยสาร',signedBy:'ลายเซ็นผู้โดยสาร',
     passenger:'ผู้โดยสาร',
+    refresh:'รีเฟรช',
   },
   en:{
     title:'Trip Voucher',sub:'Inchcape Shipping Services (Thailand) Ltd.',
@@ -108,22 +120,33 @@ const T={
     note:'Remarks',
     next:'Next → Get signature',back:'← Back',
     confirm:'✓ Confirm & issue voucher',
+    saving:'Saving...',
     newVoucher:'+ New voucher',print:'Print',history:'History',
+    loadHistory:'Load history',loading:'Loading...',
     sign:'Customer signature',clearSig:'Clear',saveSig:'Confirm signature',
     sigSaved:'Signature saved. Press confirm to issue voucher.',
     done:'Voucher issued!',
+    saveOk:'Saved to Google Sheets',
+    saveErr:'Save failed — check URL or internet connection',
+    loadErr:'Could not load history',
     route:'Route',
     step1:'Details',step2:'Signature',step3:'Done',
     noHistory:'No vouchers yet',
     sigNote:'Sign in the box below',
     passengers:'Passengers',signedBy:'Passenger signature',
     passenger:'Passenger',
+    refresh:'Refresh',
   }
 };
 
 const today=()=>new Date().toISOString().slice(0,10);
 const emptyPax=()=>({id:Date.now()+Math.random(),name:'',rank:''});
 const emptyForm=()=>({date:today(),vessel:'',from:'',to:'',departTime:'',arriveTime:'',note:'',passengers:[emptyPax()]});
+
+const parsePax=(raw)=>{
+  if(!raw)return[];
+  try{return JSON.parse(raw)}catch{return[]}
+};
 
 function SignaturePad({onSave,onClear,t}){
   const ref=useRef(null);
@@ -175,12 +198,12 @@ function SignaturePad({onSave,onClear,t}){
 
 function VoucherView({v}){
   const t=T[v.lang||'th'];
-  const paxList=v.passengers||[];
+  const paxList=typeof v.passengers==='string'?parsePax(v.passengers):(v.passengers||[]);
   return(
     <div style={{border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden',boxShadow:'0 2px 12px rgba(0,0,0,0.07)'}}>
       <div className="voucher-header">
         <div className="voucher-logo-bar">
-          <img src="ISS Logo.png" alt="ISS Logo" style={{height:'46px', display:'block', objectFit:'contain'}}/>
+          <img src="ISS Logo.png" alt="ISS" style={{height:46,display:'block',objectFit:'contain'}} onError={e=>e.target.style.display='none'}/>
           <div style={{textAlign:'right'}}>
             <div style={{fontSize:10,opacity:0.5,letterSpacing:'0.08em',textTransform:'uppercase'}}>#{String(v.id).slice(-6)}</div>
             <div style={{fontSize:11,opacity:0.7,marginTop:2}}>{v.createdAt}</div>
@@ -240,20 +263,64 @@ function App(){
   const [done,setDone]=useState(null);
   const [vouchers,setVouchers]=useState([]);
   const [viewing,setViewing]=useState(null);
+  const [saving,setSaving]=useState(false);
+  const [saveStatus,setSaveStatus]=useState(null); // 'ok' | 'err' | null
+  const [loadingHist,setLoadingHist]=useState(false);
+  const [loadErr,setLoadErr]=useState(false);
 
   const setF=(k)=>(e)=>setForm(p=>({...p,[k]:e.target.value}));
   const setPax=(id,k,v)=>setForm(p=>({...p,passengers:p.passengers.map(px=>px.id===id?{...px,[k]:v}:px)}));
   const addPax=()=>setForm(p=>({...p,passengers:[...p.passengers,emptyPax()]}));
   const removePax=(id)=>setForm(p=>({...p,passengers:p.passengers.filter(px=>px.id!==id)}));
   const submitForm=(e)=>{e.preventDefault();setStep('sign')};
-  const confirm=()=>{
+
+  const loadHistory=async()=>{
+    setLoadingHist(true);
+    setLoadErr(false);
+    try{
+      const res=await fetch(APPS_SCRIPT_URL+'?t='+Date.now());
+      const json=await res.json();
+      if(json.status==='ok'){
+        const rows=[...json.data].reverse().map(v=>({
+          ...v,
+          passengers:parsePax(v.passengers),
+        }));
+        setVouchers(rows);
+      }else{setLoadErr(true)}
+    }catch(e){setLoadErr(true)}
+    setLoadingHist(false);
+  };
+
+  const confirm=async()=>{
     if(!sig)return alert(lang==='th'?'กรุณาเซ็นชื่อก่อน':'Please sign before confirming');
-    const v={...form,id:Date.now(),signature:sig,lang,createdAt:new Date().toLocaleString(lang==='th'?'th-TH':'en-GB')};
-    setVouchers(p=>[v,...p]);
-    setDone(v);
+    setSaving(true);
+    setSaveStatus(null);
+    const v={
+      ...form,
+      id:Date.now(),
+      signature:sig,
+      lang,
+      createdAt:new Date().toLocaleString(lang==='th'?'th-TH':'en-GB'),
+      passengers:JSON.stringify(form.passengers),
+    };
+    try{
+      const res=await fetch(APPS_SCRIPT_URL,{
+        method:'POST',
+        body:JSON.stringify(v),
+      });
+      const json=await res.json();
+      setSaveStatus(json.status==='ok'?'ok':'err');
+    }catch(e){
+      setSaveStatus('err');
+    }
+    const vDisplay={...v,passengers:form.passengers};
+    setVouchers(p=>[vDisplay,...p]);
+    setDone(vDisplay);
+    setSaving(false);
     setStep('done');
   };
-  const newForm=()=>{setForm(emptyForm());setSig(null);setDone(null);setStep('form')};
+
+  const newForm=()=>{setForm(emptyForm());setSig(null);setDone(null);setSaveStatus(null);setStep('form')};
 
   if(viewing)return(
     <div className="wrap">
@@ -269,23 +336,41 @@ function App(){
     <div className="wrap">
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
         <div style={{fontWeight:700,fontSize:16,color:'#1e293b'}}>{t.history}</div>
-        <button className="btn" onClick={()=>setStep('form')}>{lang==='th'?'← กลับ':'← Back'}</button>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn" style={{padding:'6px 12px',fontSize:12}} onClick={loadHistory} disabled={loadingHist}>
+            {loadingHist?<><span className="spinner spinner-blue"></span>{t.loading}</>:t.refresh}
+          </button>
+          <button className="btn" onClick={()=>setStep('form')}>{lang==='th'?'← กลับ':'← Back'}</button>
+        </div>
       </div>
-      {vouchers.length===0
-        ?<p style={{textAlign:'center',color:'#94a3b8',padding:40}}>{t.noHistory}</p>
-        :vouchers.map(v=>(
-          <div className="history-item" key={v.id} onClick={()=>setViewing(v)}>
-            <div>
-              <div style={{fontWeight:600,fontSize:13,color:'#1e293b'}}>{v.vessel}</div>
-              <div style={{fontSize:12,color:'#64748b',marginTop:1}}>{v.from} → {v.to}</div>
-              <div style={{fontSize:11,color:'#94a3b8',marginTop:2}}>{(v.passengers||[]).map(p=>p.name).filter(Boolean).join(', ')}</div>
-            </div>
-            <div style={{textAlign:'right'}}>
-              <div style={{fontSize:11,color:'#94a3b8'}}>{v.date}</div>
+      {loadingHist&&(
+        <div style={{textAlign:'center',padding:32,color:'#64748b'}}>
+          <span className="spinner spinner-blue"></span> {t.loading}
+        </div>
+      )}
+      {loadErr&&!loadingHist&&(
+        <div className="alert-error">{t.loadErr}</div>
+      )}
+      {!loadingHist&&!loadErr&&vouchers.length===0&&(
+        <div style={{textAlign:'center',padding:40}}>
+          <p style={{color:'#94a3b8',marginBottom:12}}>{t.noHistory}</p>
+          <button className="btn btn-primary" onClick={loadHistory}>{t.loadHistory}</button>
+        </div>
+      )}
+      {!loadingHist&&vouchers.map(v=>(
+        <div className="history-item" key={v.id} onClick={()=>setViewing(v)}>
+          <div>
+            <div style={{fontWeight:600,fontSize:13,color:'#1e293b'}}>{v.vessel}</div>
+            <div style={{fontSize:12,color:'#64748b',marginTop:1}}>{v.from} → {v.to}</div>
+            <div style={{fontSize:11,color:'#94a3b8',marginTop:2}}>
+              {(typeof v.passengers==='string'?parsePax(v.passengers):v.passengers||[]).map(p=>p.name).filter(Boolean).join(', ')}
             </div>
           </div>
-        ))
-      }
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:11,color:'#94a3b8'}}>{v.date}</div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 
@@ -293,11 +378,9 @@ function App(){
     <div className="wrap">
       {/* Top bar */}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}} className="no-print">
-        <img src="ISS Logo.png" alt="ISS Logo" className="app-logo"/>
+        <img src="ISS Logo.png" alt="ISS Logo" className="app-logo" onError={e=>e.target.style.display='none'}/>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
-          {vouchers.length>0&&step!=='done'&&(
-            <button className="badge" onClick={()=>setStep('history')}>{t.history} ({vouchers.length})</button>
-          )}
+          <button className="badge" onClick={()=>{setStep('history');loadHistory()}}>{t.history}</button>
           <div className="lang-toggle">
             <button className={`lang-btn${lang==='th'?' active':''}`} onClick={()=>setLang('th')}>TH</button>
             <button className={`lang-btn${lang==='en'?' active':''}`} onClick={()=>setLang('en')}>EN</button>
@@ -333,8 +416,6 @@ function App(){
             <div className="field"><label>{t.to} *</label><input placeholder={lang==='th'?'จุดส่ง':'Drop-off point'} value={form.to} onChange={setF('to')} required/></div>
           </div>
           <div className="field"><label>{t.arrive}</label><input type="time" value={form.arriveTime} onChange={setF('arriveTime')}/></div>
-
-          {/* Passengers */}
           <div style={{borderTop:'1px solid #f1f5f9',paddingTop:14,marginTop:2}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
               <label style={{margin:0}}>{t.pax} *</label>
@@ -364,7 +445,6 @@ function App(){
               </div>
             ))}
           </div>
-
           <div className="field" style={{marginTop:4}}><label>{t.note}</label><textarea rows={2} value={form.note} onChange={setF('note')}/></div>
           <button type="submit" className="btn btn-primary" style={{width:'100%',padding:13}}>{t.next}</button>
         </form>
@@ -387,8 +467,10 @@ function App(){
           <SignaturePad onSave={setSig} onClear={()=>setSig(null)} t={t}/>
           {sig&&<div className="alert-green">✓ {t.sigSaved}</div>}
           <div className="btn-row" style={{marginTop:12}}>
-            <button className="btn" onClick={()=>setStep('form')}>{t.back}</button>
-            <button className="btn btn-success" onClick={confirm} disabled={!sig}>{t.confirm}</button>
+            <button className="btn" onClick={()=>setStep('form')} disabled={saving}>{t.back}</button>
+            <button className="btn btn-success" onClick={confirm} disabled={!sig||saving}>
+              {saving?<><span className="spinner"></span>{t.saving}</>:t.confirm}
+            </button>
           </div>
         </div>
       )}
@@ -399,6 +481,8 @@ function App(){
           <div className="alert-success no-print">
             <div style={{fontSize:32,marginBottom:6}}>✅</div>
             <div style={{fontWeight:700,color:'#15803d',fontSize:16}}>{t.done}</div>
+            {saveStatus==='ok'&&<div style={{fontSize:12,color:'#16a34a',marginTop:4}}>☁️ {t.saveOk}</div>}
+            {saveStatus==='err'&&<div style={{fontSize:12,color:'#dc2626',marginTop:4}}>⚠️ {t.saveErr}</div>}
           </div>
           <VoucherView v={done}/>
           <div className="btn-row no-print" style={{marginTop:10}}>
