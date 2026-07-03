@@ -148,6 +148,33 @@ const parsePax=(raw)=>{
   try{return JSON.parse(raw)}catch{return[]}
 };
 
+/* ── แก้เวลาที่ Google Sheets ส่งกลับมาเป็น ISO string ── */
+const cleanTime=(val)=>{
+  if(!val)return'';
+  const s=String(val);
+  /* HH:MM ปกติ — ใช้ได้เลย */
+  if(/^\d{1,2}:\d{2}$/.test(s))return s;
+  /* ISO string เช่น 1899-12-30T16:27:56.000Z */
+  if(s.includes('T')){
+    const d=new Date(s);
+    if(!isNaN(d)){
+      return String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0');
+    }
+  }
+  return s;
+};
+
+/* ── แก้วันที่ที่ Google Sheets อาจส่งกลับมาเป็น ISO string ── */
+const cleanDate=(val)=>{
+  if(!val)return'';
+  const s=String(val);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+  if(s.includes('T')){
+    return s.slice(0,10);
+  }
+  return s;
+};
+
 function SignaturePad({onSave,onClear,t}){
   const ref=useRef(null);
   const drawing=useRef(false);
@@ -199,6 +226,9 @@ function SignaturePad({onSave,onClear,t}){
 function VoucherView({v}){
   const t=T[v.lang||'th'];
   const paxList=typeof v.passengers==='string'?parsePax(v.passengers):(v.passengers||[]);
+  const dTime=cleanTime(v.departTime);
+  const aTime=cleanTime(v.arriveTime);
+  const dDate=cleanDate(v.date);
   return(
     <div style={{border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden',boxShadow:'0 2px 12px rgba(0,0,0,0.07)'}}>
       <div className="voucher-header">
@@ -216,12 +246,12 @@ function VoucherView({v}){
       </div>
       <div className="voucher-body">
         {[
-          [t.date,v.date],
-          [t.vessel,v.vessel],
-          [t.from,v.from],
-          [t.to,v.to],
-          v.departTime&&[t.depart,v.departTime+' น.'],
-          v.arriveTime&&[t.arrive,v.arriveTime+' น.'],
+          [t.date, dDate],
+          [t.vessel, v.vessel],
+          [t.from, v.from],
+          [t.to, v.to],
+          dTime&&[t.depart, dTime+' น.'],
+          aTime&&[t.arrive, aTime+' น.'],
         ].filter(Boolean).map(([l,val])=>(
           <div className="vf" key={l}><label>{l}</label><p>{val||'-'}</p></div>
         ))}
@@ -264,7 +294,7 @@ function App(){
   const [vouchers,setVouchers]=useState([]);
   const [viewing,setViewing]=useState(null);
   const [saving,setSaving]=useState(false);
-  const [saveStatus,setSaveStatus]=useState(null); // 'ok' | 'err' | null
+  const [saveStatus,setSaveStatus]=useState(null);
   const [loadingHist,setLoadingHist]=useState(false);
   const [loadErr,setLoadErr]=useState(false);
 
@@ -304,10 +334,7 @@ function App(){
       passengers:JSON.stringify(form.passengers),
     };
     try{
-      const res=await fetch(APPS_SCRIPT_URL,{
-        method:'POST',
-        body:JSON.stringify(v),
-      });
+      const res=await fetch(APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify(v)});
       const json=await res.json();
       setSaveStatus(json.status==='ok'?'ok':'err');
     }catch(e){
@@ -367,7 +394,7 @@ function App(){
             </div>
           </div>
           <div style={{textAlign:'right'}}>
-            <div style={{fontSize:11,color:'#94a3b8'}}>{v.date}</div>
+            <div style={{fontSize:11,color:'#94a3b8'}}>{cleanDate(v.date)}</div>
           </div>
         </div>
       ))}
@@ -376,7 +403,6 @@ function App(){
 
   return(
     <div className="wrap">
-      {/* Top bar */}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}} className="no-print">
         <img src="ISS Logo.png" alt="ISS Logo" className="app-logo" onError={e=>e.target.style.display='none'}/>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
@@ -388,7 +414,6 @@ function App(){
         </div>
       </div>
 
-      {/* Steps */}
       <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:18}} className="no-print">
         {[t.step1,t.step2,t.step3].map((s,i)=>{
           const active=(i===0&&step==='form')||(i===1&&step==='sign')||(i===2&&step==='done');
@@ -403,7 +428,6 @@ function App(){
         })}
       </div>
 
-      {/* FORM */}
       {step==='form'&&(
         <form onSubmit={submitForm} className="card">
           <div className="grid2">
@@ -450,7 +474,6 @@ function App(){
         </form>
       )}
 
-      {/* SIGN */}
       {step==='sign'&&(
         <div className="card">
           <div style={{fontWeight:700,fontSize:15,color:'#1e293b',marginBottom:12}}>{t.sign}</div>
@@ -475,7 +498,6 @@ function App(){
         </div>
       )}
 
-      {/* DONE */}
       {step==='done'&&done&&(
         <>
           <div className="alert-success no-print">
