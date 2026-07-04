@@ -96,25 +96,17 @@ const T={
     pax:'รายชื่อผู้โดยสาร',name:'ชื่อ-นามสกุล',rank:'ตำแหน่ง',
     addPax:'+ เพิ่มผู้โดยสาร',remove:'ลบ',from:'ต้นทาง',to:'ปลายทาง',note:'หมายเหตุ',
     next:'ถัดไป → สร้าง Link',back:'← ย้อนกลับ',
-    createLink:'🔗 สร้าง Link สำหรับเซ็น',
-    copyLink:'คัดลอก Link',copied:'คัดลอกแล้ว!',
-    sendLine:'ส่งทาง Line',
-    confirm:'✓ ยืนยันลายเซ็น',
-    saving:'กำลังบันทึก...',
+    copyLink:'คัดลอก Link',copied:'คัดลอกแล้ว!',sendLine:'ส่งทาง Line',
+    confirm:'✓ ยืนยันลายเซ็น',saving:'กำลังบันทึก...',
     newVoucher:'+ ใบเที่ยวใหม่',print:'พิมพ์',history:'ประวัติ',
     loadHistory:'โหลดประวัติ',loading:'กำลังโหลด...',
-    sign:'เซ็นชื่อรับรองใบเที่ยว',
-    clearSig:'ล้าง',saveSig:'ยืนยันลายเซ็น',
+    sign:'เซ็นชื่อรับรองใบเที่ยว',clearSig:'ล้าง',saveSig:'ยืนยันลายเซ็น',
     sigSaved:'บันทึกลายเซ็นแล้ว กดยืนยันเพื่อส่ง',
-    done:'ลงนามเรียบร้อย!',
-    officeDone:'ออกใบเที่ยวเรียบร้อย!',
-    saveOk:'บันทึกลง Google Sheets แล้ว',
+    done:'ลงนามเรียบร้อย!',saveOk:'บันทึกลง Google Sheets แล้ว',
     saveErr:'บันทึกไม่สำเร็จ — ตรวจสอบอินเทอร์เน็ต',
-    loadErr:'โหลดประวัติไม่สำเร็จ',
-    route:'เส้นทาง',
+    loadErr:'โหลดประวัติไม่สำเร็จ',route:'เส้นทาง',
     step1:'กรอกข้อมูล',step2:'สร้าง Link',step3:'เสร็จสิ้น',
-    noHistory:'ยังไม่มีประวัติ',
-    sigNote:'วาดลายเซ็นในกรอบด้านล่าง',
+    noHistory:'ยังไม่มีประวัติ',sigNote:'วาดลายเซ็นในกรอบด้านล่าง',
     passengers:'ผู้โดยสาร',signedBy:'ลายเซ็นผู้โดยสาร',
     passenger:'ผู้โดยสาร',refresh:'รีเฟรช',
     linkReady:'Link พร้อมส่งให้ลูกเรือแล้ว',
@@ -122,6 +114,7 @@ const T={
     waitSign:'รอลูกเรือเซ็นชื่อ...',
     signMode:'โหมดเซ็นชื่อ',
     pleaseSign:'กรุณาตรวจสอบข้อมูลและเซ็นชื่อด้านล่าง',
+    creating:'กำลังสร้าง...',
   },
   en:{
     title:'Trip Voucher',sub:'Inchcape Shipping Services (Thailand) Ltd.',
@@ -129,25 +122,17 @@ const T={
     pax:'Passengers',name:'Full name',rank:'Rank',
     addPax:'+ Add passenger',remove:'Remove',from:'From',to:'To',note:'Remarks',
     next:'Next → Create Link',back:'← Back',
-    createLink:'🔗 Create signing link',
-    copyLink:'Copy link',copied:'Copied!',
-    sendLine:'Send via Line',
-    confirm:'✓ Confirm signature',
-    saving:'Saving...',
+    copyLink:'Copy link',copied:'Copied!',sendLine:'Send via Line',
+    confirm:'✓ Confirm signature',saving:'Saving...',
     newVoucher:'+ New voucher',print:'Print',history:'History',
     loadHistory:'Load history',loading:'Loading...',
-    sign:'Sign to confirm trip voucher',
-    clearSig:'Clear',saveSig:'Confirm signature',
+    sign:'Sign to confirm trip voucher',clearSig:'Clear',saveSig:'Confirm signature',
     sigSaved:'Signature saved. Press confirm to submit.',
-    done:'Signed successfully!',
-    officeDone:'Voucher issued!',
-    saveOk:'Saved to Google Sheets',
+    done:'Signed successfully!',saveOk:'Saved to Google Sheets',
     saveErr:'Save failed — check internet connection',
-    loadErr:'Could not load history',
-    route:'Route',
+    loadErr:'Could not load history',route:'Route',
     step1:'Details',step2:'Create Link',step3:'Done',
-    noHistory:'No vouchers yet',
-    sigNote:'Sign in the box below',
+    noHistory:'No vouchers yet',sigNote:'Sign in the box below',
     passengers:'Passengers',signedBy:'Passenger signature',
     passenger:'Passenger',refresh:'Refresh',
     linkReady:'Link is ready to send',
@@ -155,6 +140,7 @@ const T={
     waitSign:'Waiting for crew signature...',
     signMode:'Signature mode',
     pleaseSign:'Please review details and sign below',
+    creating:'Creating...',
   }
 };
 
@@ -187,11 +173,9 @@ const cleanDate=(val)=>{
   return s;
 };
 
-/* ── encode/decode แบบ base64url — ไม่มี +/= ที่ทำให้ URL เพี้ยน ── */
 const encodeData=(obj)=>{
   try{
-    const json=JSON.stringify(obj);
-    const b64=btoa(unescape(encodeURIComponent(json)));
+    const b64=btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
     return b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'');
   }catch{return''}
 };
@@ -203,9 +187,12 @@ const decodeData=(str)=>{
   }catch{return null}
 };
 
-const getSignParam=()=>{
-  const p=new URLSearchParams(window.location.search);
-  return p.get('sign');
+const getSignParam=()=>new URLSearchParams(window.location.search).get('sign');
+
+/* ── POST ไป Apps Script ── */
+const postToSheets=async(payload)=>{
+  const res=await fetch(APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify(payload)});
+  return res.json();
 };
 
 function SignaturePad({onSave,onClear,t}){
@@ -304,7 +291,7 @@ function VoucherCard({v,t}){
         <div className="voucher-sig">
           <div style={{fontSize:10,color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:600,marginBottom:6}}>{t.signedBy}</div>
           <img src={v.signature} style={{height:54,objectFit:'contain',border:'1px solid #e2e8f0',borderRadius:6,padding:4,background:'#fff'}}/>
-          <div style={{fontSize:11,color:'#94a3b8',marginTop:4}}>{paxList.map(p=>p.name).filter(Boolean).join(', ')||'-'} — {v.createdAt}</div>
+          <div style={{fontSize:11,color:'#94a3b8',marginTop:4}}>{paxList.map(p=>p.name).filter(Boolean).join(', ')||'-'} — {v.signedAt||v.createdAt}</div>
         </div>
       )}
       <div className="voucher-footer">
@@ -315,25 +302,29 @@ function VoucherCard({v,t}){
   );
 }
 
+/* ════════════════════════════════
+   โหมดเซ็น — ลูกเรือเปิด link
+════════════════════════════════ */
 function SignMode({data}){
   const [lang,setLang]=useState(data.lang||'th');
   const t=T[lang];
   const [sig,setSig]=useState(null);
   const [saving,setSaving]=useState(false);
   const [status,setStatus]=useState(null);
+  const [signedAt,setSignedAt]=useState('');
 
   const confirm=async()=>{
     if(!sig)return alert(lang==='th'?'กรุณาเซ็นชื่อก่อน':'Please sign first');
     setSaving(true);
-    const v={
-      ...data,
-      signature:sig,
-      createdAt:new Date().toLocaleString(lang==='th'?'th-TH':'en-GB'),
-      passengers:JSON.stringify(parsePax(data.passengers)),
-    };
+    const now=new Date().toLocaleString(lang==='th'?'th-TH':'en-GB');
+    setSignedAt(now);
     try{
-      const res=await fetch(APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify(v)});
-      const json=await res.json();
+      const json=await postToSheets({
+        action:'sign',           /* ← บอก Apps Script ว่าเป็นการอัปเดต */
+        id:data.id,
+        signature:sig,
+        signedAt:now,
+      });
       setStatus(json.status==='ok'?'ok':'err');
     }catch{setStatus('err')}
     setSaving(false);
@@ -346,7 +337,7 @@ function SignMode({data}){
         <div style={{fontWeight:700,color:'#15803d',fontSize:18,marginBottom:6}}>{t.done}</div>
         <div style={{fontSize:13,color:'#64748b'}}>{t.saveOk}</div>
       </div>
-      <VoucherCard v={{...data,signature:sig,createdAt:new Date().toLocaleString(lang==='th'?'th-TH':'en-GB')}} t={t}/>
+      <VoucherCard v={{...data,signature:sig,signedAt}} t={t}/>
     </div>
   );
 
@@ -376,6 +367,9 @@ function SignMode({data}){
   );
 }
 
+/* ════════════════════════════════
+   โหมด Office — กรอกข้อมูล
+════════════════════════════════ */
 function OfficeMode(){
   const [lang,setLang]=useState('th');
   const t=T[lang];
@@ -383,6 +377,7 @@ function OfficeMode(){
   const [form,setForm]=useState(emptyForm());
   const [signLink,setSignLink]=useState('');
   const [copied,setCopied]=useState(false);
+  const [creating,setCreating]=useState(false);
   const [vouchers,setVouchers]=useState([]);
   const [viewing,setViewing]=useState(null);
   const [loadingHist,setLoadingHist]=useState(false);
@@ -393,11 +388,37 @@ function OfficeMode(){
   const addPax=()=>setForm(p=>({...p,passengers:[...p.passengers,emptyPax()]}));
   const removePax=(id)=>setForm(p=>({...p,passengers:p.passengers.filter(px=>px.id!==id)}));
 
-  const submitForm=(e)=>{
+  const submitForm=async(e)=>{
     e.preventDefault();
-    const data={...form,id:Date.now(),lang,passengers:form.passengers};
+    setCreating(true);
+    const data={
+      ...form,
+      id:Date.now(),
+      lang,
+      passengers:form.passengers,
+      createdAt:new Date().toLocaleString(lang==='th'?'th-TH':'en-GB'),
+    };
+    /* บันทึก Sheets ทันที (action=create, สถานะ pending) */
+    try{
+      await postToSheets({
+        action:'create',
+        id:data.id,
+        date:data.date,
+        vessel:data.vessel,
+        from:data.from,
+        to:data.to,
+        departTime:data.departTime||'',
+        arriveTime:data.arriveTime||'',
+        passengers:JSON.stringify(data.passengers),
+        note:data.note||'',
+        lang:data.lang,
+        createdAt:data.createdAt,
+      });
+    }catch(e){console.warn('create failed',e)}
+    /* สร้าง link สำหรับลูกเรือ (ไม่ใส่ลายเซ็น) */
     const encoded=encodeData(data);
     setSignLink(BASE_URL+'?sign='+encoded);
+    setCreating(false);
     setStep('link');
   };
 
@@ -464,7 +485,7 @@ function OfficeMode(){
           </div>
           <div style={{textAlign:'right'}}>
             <div style={{fontSize:11,color:'#94a3b8'}}>{cleanDate(v.date)}</div>
-            {v.signature
+            {v.status==='signed'
               ?<div style={{fontSize:11,color:'#16a34a',marginTop:3}}>✓ เซ็นแล้ว</div>
               :<div style={{fontSize:11,color:'#f59e0b',marginTop:3}}>⏳ รอเซ็น</div>
             }
@@ -540,7 +561,9 @@ function OfficeMode(){
             ))}
           </div>
           <div className="field" style={{marginTop:4}}><label>{t.note}</label><textarea rows={2} value={form.note} onChange={setF('note')}/></div>
-          <button type="submit" className="btn btn-primary" style={{width:'100%',padding:13}}>{t.next}</button>
+          <button type="submit" className="btn btn-primary" style={{width:'100%',padding:13}} disabled={creating}>
+            {creating?<><span className="spinner"></span>{t.creating}</>:t.next}
+          </button>
         </form>
       )}
 
