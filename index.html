@@ -85,7 +85,6 @@ textarea{resize:none}
 const {useState,useRef,useEffect}=React;
 
 const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbxmNyfxP7-Afji7lwrWxozcnzRjT-GnebQ7mFChVJmE1dXoKcd7kYyBQQfvGscMG0qNtQ/exec';
-/* ── แก้ตรงนี้เป็น URL จริงของ GitHub Pages ── */
 const BASE_URL=window.location.origin+window.location.pathname;
 
 const RANKS=['Captain','Chief Officer','2nd Officer','3rd Officer','Chief Engineer','2nd Engineer','3rd Engineer','4th Engineer','Bosun','AB Seaman','OS','Cook','Electrician','Other'];
@@ -188,15 +187,22 @@ const cleanDate=(val)=>{
   return s;
 };
 
-/* encode/decode ข้อมูลใส่ URL */
+/* ── encode/decode แบบ base64url — ไม่มี +/= ที่ทำให้ URL เพี้ยน ── */
 const encodeData=(obj)=>{
-  try{return btoa(unescape(encodeURIComponent(JSON.stringify(obj))))}catch{return''}
+  try{
+    const json=JSON.stringify(obj);
+    const b64=btoa(unescape(encodeURIComponent(json)));
+    return b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'');
+  }catch{return''}
 };
 const decodeData=(str)=>{
-  try{return JSON.parse(decodeURIComponent(escape(atob(str))))}catch{return null}
+  try{
+    const b64=str.replace(/-/g,'+').replace(/_/g,'/');
+    const padded=b64+('==='.slice(0,(4-b64.length%4)%4));
+    return JSON.parse(decodeURIComponent(escape(atob(padded))));
+  }catch{return null}
 };
 
-/* อ่าน ?sign= จาก URL */
 const getSignParam=()=>{
   const p=new URLSearchParams(window.location.search);
   return p.get('sign');
@@ -309,15 +315,12 @@ function VoucherCard({v,t}){
   );
 }
 
-/* ════════════════════════════════
-   โหมดเซ็น — ลูกเรือเปิด link
-════════════════════════════════ */
 function SignMode({data}){
   const [lang,setLang]=useState(data.lang||'th');
   const t=T[lang];
   const [sig,setSig]=useState(null);
   const [saving,setSaving]=useState(false);
-  const [status,setStatus]=useState(null); // 'ok'|'err'
+  const [status,setStatus]=useState(null);
 
   const confirm=async()=>{
     if(!sig)return alert(lang==='th'?'กรุณาเซ็นชื่อก่อน':'Please sign first');
@@ -349,7 +352,6 @@ function SignMode({data}){
 
   return(
     <div className="wrap">
-      {/* header */}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
         <img src="ISS Logo.png" alt="ISS" className="app-logo" onError={e=>e.target.style.display='none'}/>
         <div className="lang-toggle">
@@ -357,24 +359,16 @@ function SignMode({data}){
           <button className={`lang-btn${lang==='en'?' active':''}`} onClick={()=>setLang('en')}>EN</button>
         </div>
       </div>
-
       <div className="alert-yellow" style={{marginBottom:14}}>
         📋 <strong>{t.signMode}</strong> — {t.pleaseSign}
       </div>
-
       <VoucherCard v={data} t={t}/>
-
       <div className="card" style={{marginTop:12}}>
         <div style={{fontWeight:700,fontSize:15,color:'#1e293b',marginBottom:12}}>{t.sign}</div>
         <SignaturePad onSave={setSig} onClear={()=>setSig(null)} t={t}/>
         {sig&&<div className="alert-green">✓ {t.sigSaved}</div>}
         {status==='err'&&<div className="alert-error">{t.saveErr}</div>}
-        <button
-          className="btn btn-success"
-          style={{width:'100%',marginTop:12,padding:13}}
-          onClick={confirm}
-          disabled={!sig||saving}
-        >
+        <button className="btn btn-success" style={{width:'100%',marginTop:12,padding:13}} onClick={confirm} disabled={!sig||saving}>
           {saving?<><span className="spinner"></span>{t.saving}</>:t.confirm}
         </button>
       </div>
@@ -382,13 +376,10 @@ function SignMode({data}){
   );
 }
 
-/* ════════════════════════════════
-   โหมด Office — กรอกข้อมูล
-════════════════════════════════ */
 function OfficeMode(){
   const [lang,setLang]=useState('th');
   const t=T[lang];
-  const [step,setStep]=useState('form'); // form | link | history
+  const [step,setStep]=useState('form');
   const [form,setForm]=useState(emptyForm());
   const [signLink,setSignLink]=useState('');
   const [copied,setCopied]=useState(false);
@@ -404,15 +395,9 @@ function OfficeMode(){
 
   const submitForm=(e)=>{
     e.preventDefault();
-    const data={
-      ...form,
-      id:Date.now(),
-      lang,
-      passengers:form.passengers,
-    };
+    const data={...form,id:Date.now(),lang,passengers:form.passengers};
     const encoded=encodeData(data);
-    const link=BASE_URL+'?sign='+encoded;
-    setSignLink(link);
+    setSignLink(BASE_URL+'?sign='+encoded);
     setStep('link');
   };
 
@@ -429,21 +414,18 @@ function OfficeMode(){
   };
 
   const loadHistory=async()=>{
-    setLoadingHist(true);
-    setLoadErr(false);
+    setLoadingHist(true);setLoadErr(false);
     try{
       const res=await fetch(APPS_SCRIPT_URL+'?t='+Date.now());
       const json=await res.json();
-      if(json.status==='ok'){
-        setVouchers([...json.data].reverse().map(v=>({...v,passengers:parsePax(v.passengers)})));
-      }else setLoadErr(true);
+      if(json.status==='ok') setVouchers([...json.data].reverse().map(v=>({...v,passengers:parsePax(v.passengers)})));
+      else setLoadErr(true);
     }catch{setLoadErr(true)}
     setLoadingHist(false);
   };
 
   const newForm=()=>{setForm(emptyForm());setSignLink('');setCopied(false);setStep('form')};
 
-  /* ── ดูประวัติ ── */
   if(viewing)return(
     <div className="wrap">
       <div className="btn-row no-print" style={{marginBottom:12}}>
@@ -478,9 +460,7 @@ function OfficeMode(){
           <div>
             <div style={{fontWeight:600,fontSize:13,color:'#1e293b'}}>{v.vessel}</div>
             <div style={{fontSize:12,color:'#64748b',marginTop:1}}>{v.from} → {v.to}</div>
-            <div style={{fontSize:11,color:'#94a3b8',marginTop:2}}>
-              {parsePax(v.passengers).map(p=>p.name).filter(Boolean).join(', ')}
-            </div>
+            <div style={{fontSize:11,color:'#94a3b8',marginTop:2}}>{parsePax(v.passengers).map(p=>p.name).filter(Boolean).join(', ')}</div>
           </div>
           <div style={{textAlign:'right'}}>
             <div style={{fontSize:11,color:'#94a3b8'}}>{cleanDate(v.date)}</div>
@@ -496,7 +476,6 @@ function OfficeMode(){
 
   return(
     <div className="wrap">
-      {/* Top bar */}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}} className="no-print">
         <img src="ISS Logo.png" alt="ISS Logo" className="app-logo" onError={e=>e.target.style.display='none'}/>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
@@ -507,8 +486,6 @@ function OfficeMode(){
           </div>
         </div>
       </div>
-
-      {/* Steps */}
       <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:18}} className="no-print">
         {[t.step1,t.step2,t.step3].map((s,i)=>{
           const active=(i===0&&step==='form')||(i===1&&step==='link');
@@ -523,7 +500,6 @@ function OfficeMode(){
         })}
       </div>
 
-      {/* FORM */}
       {step==='form'&&(
         <form onSubmit={submitForm} className="card">
           <div className="grid2">
@@ -568,7 +544,6 @@ function OfficeMode(){
         </form>
       )}
 
-      {/* LINK */}
       {step==='link'&&(
         <div className="card">
           <div style={{textAlign:'center',marginBottom:16}}>
@@ -576,9 +551,7 @@ function OfficeMode(){
             <div style={{fontWeight:700,fontSize:16,color:'#1e293b',marginBottom:4}}>{t.linkReady}</div>
             <div style={{fontSize:13,color:'#64748b'}}>{t.linkDesc}</div>
           </div>
-
           <div className="link-box">{signLink}</div>
-
           <div className="btn-row" style={{marginBottom:10}}>
             <button className={`copy-btn${copied?' copied':''}`} style={{flex:1,padding:'10px'}} onClick={copyLink}>
               {copied?'✓ '+t.copied:'📋 '+t.copyLink}
@@ -587,13 +560,11 @@ function OfficeMode(){
               💬 {t.sendLine}
             </button>
           </div>
-
           <div className="alert-blue">
             <div style={{marginBottom:4}}>⏳ {t.waitSign}</div>
             <div style={{fontSize:12,opacity:0.8}}>{t.vessel}: <strong>{form.vessel}</strong></div>
             <div style={{fontSize:12,opacity:0.8}}>{t.route}: <strong>{form.from} → {form.to}</strong></div>
           </div>
-
           <div className="btn-row" style={{marginTop:8}}>
             <button className="btn" onClick={()=>setStep('form')}>{t.back}</button>
             <button className="btn btn-primary" onClick={newForm}>{t.newVoucher}</button>
@@ -604,9 +575,6 @@ function OfficeMode(){
   );
 }
 
-/* ════════════════════════════════
-   Root — เลือก mode
-════════════════════════════════ */
 function App(){
   const signParam=getSignParam();
   if(signParam){
