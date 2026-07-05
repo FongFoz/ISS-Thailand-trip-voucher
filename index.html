@@ -30,7 +30,6 @@ canvas{border:2px dashed #93c5fd;border-radius:10px;width:100%;background:#fff;d
 .sig-actions{display:flex;justify-content:center;gap:8px;margin-top:8px}
 .alert-blue{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px;font-size:13px;color:#1e40af;margin-bottom:10px;line-height:1.6}
 .alert-green{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;font-size:13px;color:#15803d;text-align:center;margin-top:10px}
-.alert-success{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:18px;text-align:center;margin-bottom:12px}
 .alert-error{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;font-size:13px;color:#dc2626;text-align:center;margin-top:8px}
 .alert-yellow{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px;font-size:13px;color:#92400e;margin-bottom:10px;line-height:1.6}
 .badge{font-size:11px;background:#fff;border:1px solid #bfdbfe;color:#1d4ed8;padding:5px 12px;border-radius:999px;cursor:pointer}
@@ -70,6 +69,7 @@ textarea{resize:none}
 .copy-btn{background:#f1f5f9;border:1px solid #cbd5e1;color:#374151;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;transition:all 0.15s}
 .copy-btn:hover{background:#e2e8f0}
 .copy-btn.copied{background:#dcfce7;border-color:#bbf7d0;color:#15803d}
+.loading-wrap{text-align:center;padding:60px 20px;color:#64748b}
 @media print{
   .no-print{display:none!important}
   body{background:#fff}
@@ -99,12 +99,15 @@ const T={
     copyLink:'คัดลอก Link',copied:'คัดลอกแล้ว!',sendLine:'ส่งทาง Line',
     confirm:'✓ ยืนยันลายเซ็น',saving:'กำลังบันทึก...',
     newVoucher:'+ ใบเที่ยวใหม่',print:'พิมพ์',history:'ประวัติ',
-    loadHistory:'โหลดประวัติ',loading:'กำลังโหลด...',
+    loadHistory:'โหลดประวัติ',loading:'กำลังโหลด...',loadingData:'กำลังโหลดข้อมูล...',
     sign:'เซ็นชื่อรับรองใบเที่ยว',clearSig:'ล้าง',saveSig:'ยืนยันลายเซ็น',
     sigSaved:'บันทึกลายเซ็นแล้ว กดยืนยันเพื่อส่ง',
     done:'ลงนามเรียบร้อย!',saveOk:'บันทึกลง Google Sheets แล้ว',
     saveErr:'บันทึกไม่สำเร็จ — ตรวจสอบอินเทอร์เน็ต',
-    loadErr:'โหลดประวัติไม่สำเร็จ',route:'เส้นทาง',
+    loadErr:'โหลดประวัติไม่สำเร็จ',
+    notFound:'ไม่พบข้อมูลใบเที่ยวนี้',
+    alreadySigned:'ใบเที่ยวนี้เซ็นแล้ว',
+    route:'เส้นทาง',
     step1:'กรอกข้อมูล',step2:'สร้าง Link',step3:'เสร็จสิ้น',
     noHistory:'ยังไม่มีประวัติ',sigNote:'วาดลายเซ็นในกรอบด้านล่าง',
     passengers:'ผู้โดยสาร',signedBy:'ลายเซ็นผู้โดยสาร',
@@ -125,12 +128,15 @@ const T={
     copyLink:'Copy link',copied:'Copied!',sendLine:'Send via Line',
     confirm:'✓ Confirm signature',saving:'Saving...',
     newVoucher:'+ New voucher',print:'Print',history:'History',
-    loadHistory:'Load history',loading:'Loading...',
+    loadHistory:'Load history',loading:'Loading...',loadingData:'Loading data...',
     sign:'Sign to confirm trip voucher',clearSig:'Clear',saveSig:'Confirm signature',
     sigSaved:'Signature saved. Press confirm to submit.',
     done:'Signed successfully!',saveOk:'Saved to Google Sheets',
     saveErr:'Save failed — check internet connection',
-    loadErr:'Could not load history',route:'Route',
+    loadErr:'Could not load history',
+    notFound:'Voucher not found',
+    alreadySigned:'This voucher has already been signed',
+    route:'Route',
     step1:'Details',step2:'Create Link',step3:'Done',
     noHistory:'No vouchers yet',sigNote:'Sign in the box below',
     passengers:'Passengers',signedBy:'Passenger signature',
@@ -153,18 +159,13 @@ const parsePax=(raw)=>{
   if(Array.isArray(raw))return raw;
   try{return JSON.parse(raw)}catch{return[]}
 };
-
 const cleanTime=(val)=>{
   if(!val)return'';
   const s=String(val);
   if(/^\d{1,2}:\d{2}$/.test(s))return s;
-  if(s.includes('T')){
-    const d=new Date(s);
-    if(!isNaN(d))return String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0');
-  }
+  if(s.includes('T')){const d=new Date(s);if(!isNaN(d))return String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0')}
   return s;
 };
-
 const cleanDate=(val)=>{
   if(!val)return'';
   const s=String(val);
@@ -172,69 +173,37 @@ const cleanDate=(val)=>{
   if(s.includes('T'))return s.slice(0,10);
   return s;
 };
-
-const encodeData=(obj)=>{
-  try{
-    const b64=btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
-    return b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'');
-  }catch{return''}
-};
-const decodeData=(str)=>{
-  try{
-    const b64=str.replace(/-/g,'+').replace(/_/g,'/');
-    const padded=b64+('==='.slice(0,(4-b64.length%4)%4));
-    return JSON.parse(decodeURIComponent(escape(atob(padded))));
-  }catch{return null}
-};
-
-const getSignParam=()=>new URLSearchParams(window.location.search).get('sign');
-
-/* ── POST ไป Apps Script ── */
 const postToSheets=async(payload)=>{
   const res=await fetch(APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify(payload)});
   return res.json();
 };
+const getParam=(k)=>new URLSearchParams(window.location.search).get(k);
 
 function SignaturePad({onSave,onClear,t}){
   const ref=useRef(null);
   const drawing=useRef(false);
   const last=useRef(null);
   useEffect(()=>{
-    const c=ref.current;
-    const dpr=window.devicePixelRatio||1;
-    c.width=c.offsetWidth*dpr;
-    c.height=160*dpr;
-    const ctx=c.getContext('2d');
-    ctx.scale(dpr,dpr);
-    ctx.fillStyle='#fff';
-    ctx.fillRect(0,0,c.offsetWidth,160);
+    const c=ref.current,dpr=window.devicePixelRatio||1;
+    c.width=c.offsetWidth*dpr;c.height=160*dpr;
+    const ctx=c.getContext('2d');ctx.scale(dpr,dpr);
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,c.offsetWidth,160);
   },[]);
-  const pos=(e)=>{
-    const r=ref.current.getBoundingClientRect();
-    const s=e.touches?e.touches[0]:e;
-    return{x:s.clientX-r.left,y:s.clientY-r.top};
-  };
+  const pos=(e)=>{const r=ref.current.getBoundingClientRect(),s=e.touches?e.touches[0]:e;return{x:s.clientX-r.left,y:s.clientY-r.top}};
   const down=(e)=>{e.preventDefault();drawing.current=true;last.current=pos(e)};
   const move=(e)=>{
-    e.preventDefault();
-    if(!drawing.current)return;
+    e.preventDefault();if(!drawing.current)return;
     const c=ref.current,ctx=c.getContext('2d'),p=pos(e);
     ctx.beginPath();ctx.moveTo(last.current.x,last.current.y);ctx.lineTo(p.x,p.y);
     ctx.strokeStyle='#0f2744';ctx.lineWidth=2.2;ctx.lineCap='round';ctx.stroke();
     last.current=p;
   };
   const up=(e)=>{e.preventDefault();drawing.current=false};
-  const clear=()=>{
-    const c=ref.current,ctx=c.getContext('2d');
-    ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
-    onClear();
-  };
+  const clear=()=>{const c=ref.current,ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);onClear()};
   return(
     <div>
       <p style={{fontSize:12,color:'#64748b',textAlign:'center',marginBottom:8}}>{t.sigNote}</p>
-      <canvas ref={ref} style={{height:160}}
-        onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
-        onTouchStart={down} onTouchMove={move} onTouchEnd={up}/>
+      <canvas ref={ref} style={{height:160}} onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up} onTouchStart={down} onTouchMove={move} onTouchEnd={up}/>
       <div className="sig-actions">
         <button className="btn" onClick={clear}>{t.clearSig}</button>
         <button className="btn btn-primary" onClick={()=>onSave(ref.current.toDataURL('image/png'))}>{t.saveSig}</button>
@@ -245,8 +214,7 @@ function SignaturePad({onSave,onClear,t}){
 
 function VoucherCard({v,t}){
   const paxList=parsePax(v.passengers);
-  const dTime=cleanTime(v.departTime);
-  const aTime=cleanTime(v.arriveTime);
+  const dTime=cleanTime(v.departTime),aTime=cleanTime(v.arriveTime);
   return(
     <div style={{border:'1px solid #e2e8f0',borderRadius:14,overflow:'hidden',boxShadow:'0 2px 12px rgba(0,0,0,0.07)'}}>
       <div className="voucher-header">
@@ -263,13 +231,8 @@ function VoucherCard({v,t}){
         </div>
       </div>
       <div className="voucher-body">
-        {[
-          [t.date,cleanDate(v.date)],
-          [t.vessel,v.vessel],
-          [t.from,v.from],
-          [t.to,v.to],
-          dTime&&[t.depart,dTime+' น.'],
-          aTime&&[t.arrive,aTime+' น.'],
+        {[[t.date,cleanDate(v.date)],[t.vessel,v.vessel],[t.from,v.from],[t.to,v.to],
+          dTime&&[t.depart,dTime+' น.'],aTime&&[t.arrive,aTime+' น.'],
         ].filter(Boolean).map(([l,val])=>(
           <div className="vf" key={l}><label>{l}</label><p>{val||'-'}</p></div>
         ))}
@@ -302,16 +265,30 @@ function VoucherCard({v,t}){
   );
 }
 
-/* ════════════════════════════════
-   โหมดเซ็น — ลูกเรือเปิด link
-════════════════════════════════ */
-function SignMode({data}){
-  const [lang,setLang]=useState(data.lang||'th');
+/* ════════ โหมดเซ็น — ดึงข้อมูลจาก Sheets ด้วย ID ════════ */
+function SignMode({voucherId}){
+  const [lang,setLang]=useState('th');
   const t=T[lang];
+  const [data,setData]=useState(null);
+  const [loadState,setLoadState]=useState('loading'); // loading|ok|notfound|error
   const [sig,setSig]=useState(null);
   const [saving,setSaving]=useState(false);
   const [status,setStatus]=useState(null);
   const [signedAt,setSignedAt]=useState('');
+
+  useEffect(()=>{
+    fetch(APPS_SCRIPT_URL+'?id='+voucherId+'&t='+Date.now())
+      .then(r=>r.json())
+      .then(json=>{
+        if(json.status==='ok'&&json.row){
+          setData({...json.row, passengers:parsePax(json.row.passengers)});
+          setLoadState('ok');
+        } else {
+          setLoadState('notfound');
+        }
+      })
+      .catch(()=>setLoadState('error'));
+  },[voucherId]);
 
   const confirm=async()=>{
     if(!sig)return alert(lang==='th'?'กรุณาเซ็นชื่อก่อน':'Please sign first');
@@ -319,17 +296,48 @@ function SignMode({data}){
     const now=new Date().toLocaleString(lang==='th'?'th-TH':'en-GB');
     setSignedAt(now);
     try{
-      const json=await postToSheets({
-        action:'sign',           /* ← บอก Apps Script ว่าเป็นการอัปเดต */
-        id:data.id,
-        signature:sig,
-        signedAt:now,
-      });
+      const json=await postToSheets({action:'sign',id:voucherId,signature:sig,signedAt:now});
       setStatus(json.status==='ok'?'ok':'err');
     }catch{setStatus('err')}
     setSaving(false);
   };
 
+  /* loading */
+  if(loadState==='loading')return(
+    <div className="loading-wrap">
+      <span className="spinner spinner-blue"></span>
+      <p style={{marginTop:12}}>{T[lang].loadingData}</p>
+    </div>
+  );
+
+  /* not found */
+  if(loadState==='notfound'||loadState==='error')return(
+    <div className="wrap">
+      <div style={{textAlign:'center',padding:'60px 20px'}}>
+        <div style={{fontSize:48,marginBottom:12}}>❌</div>
+        <div style={{fontWeight:700,color:'#dc2626',fontSize:16}}>{t.notFound}</div>
+      </div>
+    </div>
+  );
+
+  /* already signed */
+  if(data.status==='signed'&&!status)return(
+    <div className="wrap">
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+        <img src="ISS Logo.png" alt="ISS" className="app-logo" onError={e=>e.target.style.display='none'}/>
+        <div className="lang-toggle">
+          <button className={`lang-btn${lang==='th'?' active':''}`} onClick={()=>setLang('th')}>TH</button>
+          <button className={`lang-btn${lang==='en'?' active':''}`} onClick={()=>setLang('en')}>EN</button>
+        </div>
+      </div>
+      <div className="alert-green" style={{textAlign:'center',marginBottom:14,padding:14}}>
+        ✅ {t.alreadySigned}
+      </div>
+      <VoucherCard v={data} t={t}/>
+    </div>
+  );
+
+  /* signed just now */
   if(status==='ok')return(
     <div className="wrap">
       <div style={{textAlign:'center',padding:'40px 0'}}>
@@ -367,9 +375,7 @@ function SignMode({data}){
   );
 }
 
-/* ════════════════════════════════
-   โหมด Office — กรอกข้อมูล
-════════════════════════════════ */
+/* ════════ โหมด Office ════════ */
 function OfficeMode(){
   const [lang,setLang]=useState('th');
   const t=T[lang];
@@ -391,49 +397,29 @@ function OfficeMode(){
   const submitForm=async(e)=>{
     e.preventDefault();
     setCreating(true);
-    const data={
-      ...form,
-      id:Date.now(),
-      lang,
-      passengers:form.passengers,
-      createdAt:new Date().toLocaleString(lang==='th'?'th-TH':'en-GB'),
-    };
-    /* บันทึก Sheets ทันที (action=create, สถานะ pending) */
+    const id=Date.now();
+    const createdAt=new Date().toLocaleString(lang==='th'?'th-TH':'en-GB');
     try{
       await postToSheets({
-        action:'create',
-        id:data.id,
-        date:data.date,
-        vessel:data.vessel,
-        from:data.from,
-        to:data.to,
-        departTime:data.departTime||'',
-        arriveTime:data.arriveTime||'',
-        passengers:JSON.stringify(data.passengers),
-        note:data.note||'',
-        lang:data.lang,
-        createdAt:data.createdAt,
+        action:'create', id, date:form.date, vessel:form.vessel,
+        from:form.from, to:form.to,
+        departTime:form.departTime||'', arriveTime:form.arriveTime||'',
+        passengers:JSON.stringify(form.passengers),
+        note:form.note||'', lang, createdAt,
       });
     }catch(e){console.warn('create failed',e)}
-    /* สร้าง link สำหรับลูกเรือ (ไม่ใส่ลายเซ็น) */
-    const encoded=encodeData(data);
-    setSignLink(BASE_URL+'?sign='+encoded);
+    /* URL สั้น — แค่ ID เท่านั้น */
+    setSignLink(BASE_URL+'?id='+id);
     setCreating(false);
     setStep('link');
   };
 
   const copyLink=()=>{
-    navigator.clipboard.writeText(signLink).then(()=>{
-      setCopied(true);
-      setTimeout(()=>setCopied(false),2500);
-    });
+    navigator.clipboard.writeText(signLink).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2500)});
   };
-
   const sendLine=()=>{
-    const msg=encodeURIComponent('กรุณาเซ็นใบเที่ยวรถที่นี่:\n'+signLink);
-    window.open('https://line.me/R/msg/text/?'+msg,'_blank');
+    window.open('https://line.me/R/msg/text/?'+encodeURIComponent('กรุณาเซ็นใบเที่ยวรถที่นี่:\n'+signLink),'_blank');
   };
-
   const loadHistory=async()=>{
     setLoadingHist(true);setLoadErr(false);
     try{
@@ -444,7 +430,6 @@ function OfficeMode(){
     }catch{setLoadErr(true)}
     setLoadingHist(false);
   };
-
   const newForm=()=>{setForm(emptyForm());setSignLink('');setCopied(false);setStep('form')};
 
   if(viewing)return(
@@ -579,9 +564,7 @@ function OfficeMode(){
             <button className={`copy-btn${copied?' copied':''}`} style={{flex:1,padding:'10px'}} onClick={copyLink}>
               {copied?'✓ '+t.copied:'📋 '+t.copyLink}
             </button>
-            <button className="btn btn-green" style={{flex:1}} onClick={sendLine}>
-              💬 {t.sendLine}
-            </button>
+            <button className="btn btn-green" style={{flex:1}} onClick={sendLine}>💬 {t.sendLine}</button>
           </div>
           <div className="alert-blue">
             <div style={{marginBottom:4}}>⏳ {t.waitSign}</div>
@@ -599,12 +582,8 @@ function OfficeMode(){
 }
 
 function App(){
-  const signParam=getSignParam();
-  if(signParam){
-    const data=decodeData(signParam);
-    if(data)return <SignMode data={data}/>;
-    return<div className="wrap"><div className="alert-error" style={{marginTop:40}}>Link ไม่ถูกต้องหรือหมดอายุ</div></div>;
-  }
+  const id=getParam('id');
+  if(id)return <SignMode voucherId={id}/>;
   return <OfficeMode/>;
 }
 
